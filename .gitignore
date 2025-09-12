@@ -1,0 +1,7 @@
+**/ALPS_domain/
+**/NZ_domain/
+*.nc
+*.nc4
+*.npy
+**/__pycache__/
+*.pt
