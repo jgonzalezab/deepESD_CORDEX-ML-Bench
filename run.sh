@@ -1,9 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=deepesd_train_eval
 #SBATCH --output=logs/train_eval_%j.out
-#SBATCH --error=logs/train_eval_%j.err
+#SBATCH --error=logs/train_eval_%j.out
 #SBATCH --partition=wngpu
 #SBATCH --mem-per-cpu=127000
+#SBATCH --time=72:00:00
 
 # Set the working directory
 cd /gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench
@@ -12,13 +13,13 @@ cd /gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench
 mkdir -p logs
 
 # Activate conda environment
-source activate pnacc-gpu
+source /gpfs/projects/meteo/WORK/gonzabad/miniforge3/etc/profile.d/conda.sh
+conda activate pnacc-gpu
 
 # Define all combinations to run
 var_targets=("pr" "tasmax")
 orography_values=("True" "False")
-# domains=("ALPS" "NZ" "SA")
-domains=("ALPS")
+domains=("ALPS" "NZ" "SA")
 training_experiments=("ESD_pseudo_reality" "Emulator_hist_future")
 
 # Evaluation experiments for each training experiment
