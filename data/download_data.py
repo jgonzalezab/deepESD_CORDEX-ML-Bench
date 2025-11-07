@@ -4,7 +4,7 @@ import zipfile
 
 domain = 'ALPS'
 
-DATA_PATH = f'./'
+DATA_PATH = f'./Bench-data/{domain}'
 os.makedirs(DATA_PATH, exist_ok=True)
 
 def download_and_extract(domain, DATA_PATH=DATA_PATH):

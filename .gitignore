@@ -1,7 +1,7 @@
-**/ALPS_domain/
-**/NZ_domain/
+**/Bench-data/
 *.nc
 *.nc4
 *.npy
 **/__pycache__/
 *.pt
+**/logs/

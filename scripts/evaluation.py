@@ -1,181 +1,137 @@
-import os
-import xarray as xr
-import numpy as np
-import torch
-from torch.utils.data import DataLoader, random_split
+"""Evaluation script for DeepESD model."""
 
-import sys; sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deep4downscaling")
+import os
+import sys
+import torch
+import xarray as xr
+
+sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deep4downscaling")
+sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/src")
+
 import deep4downscaling.trans
-import deep4downscaling.deep.loss
-import deep4downscaling.deep.utils
-import deep4downscaling.deep.models
-import deep4downscaling.deep.train
 import deep4downscaling.deep.pred
 
-# Define PATHs
-DATA_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data"
-PREDS_PATH = f"{DATA_PATH}/evaluation_preds"
-MODEL_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/models"
-
-#######################################################################################################
-# Define evaluation experiment settings
-evaluation_experiment_settings = {
-    "ESD_pseudo_reality": {
-        "PP_cross_validation": ("historical", "perfect", True),
-        "Imperfect_cross_validation": ("historical", "imperfect", True),
-        "Extrapolation_perfect": ("mid_end_century", "perfect", True),
-        "Extrapolation_imperfect": ("mid_end_century", "imperfect", True),
-    },
-    "Emulator_hist_future": {
-        "PP_cross_validation": ("historical", "perfect", True),
-        "Imperfect_cross_validation": ("historical", "imperfect", True),
-        "Extrapolation_perfect": ("mid_end_century", "perfect", True),
-        "Extrapolation_perfect_hard": ("mid_end_century", "perfect", False),
-        "Extrapolation_imperfect_hard": ("mid_end_century", "imperfect", False),
-    },
-}
-
-# Map periods to dates
-period_dates = {
-    "historical": "1981-2000",
-    "mid_century": "2041-2060",
-    "end_century": "2080-2099",
-    "mid_end_century": ["2041-2060", "2080-2099"],
-}
-
-# GCM selection by domain and training setup
-gcm_train = {"NZ": "ACCESS-CM2", "ALPS": "CNRM-CM5"}
-gcm_eval = {"NZ": "EC-Earth3", "ALPS": "MPI-ESM-LR"}
-#######################################################################################################
-
-#######################################################################################################
-# Set the current combination
-var_target = 'tasmax'
-domain = 'ALPS'
-training_experiment = 'Emulator_hist_future'
-evaluation_experiment = 'Extrapolation_imperfect_hard'
-#######################################################################################################
-
-#######################################################################################################
-"""
-Despite this being an evaluation script we still need to load the predictor and predictand
-to properly initialize the DL architecture and the statistics for the standardization.
-"""
-
-# Get settings for the current combination
-if training_experiment == 'ESD_pseudo_reality':
-    period_training = '1961-1980'
-elif training_experiment == 'Emulator_hist_future':
-    period_training = '1961-1980_2080-2099'
-else:
-    raise ValueError('Provide a valid date')
-
-# Set the GCM
-if domain == 'ALPS':
-    gcm_name = 'CNRM-CM5'
-elif domain == 'NZ':
-    gcm_name = 'ACCESS-CM2'
-
-# Load predictor
-predictor_filename = f'{DATA_PATH}/{domain}_domain/train/{training_experiment}/predictors/{gcm_name}_{period_training}.nc'
-predictor = xr.open_dataset(predictor_filename)
-
-# Load predictand
-predictand_filename = f'{DATA_PATH}/{domain}_domain/train/{training_experiment}/target/pr_tasmax_{gcm_name}_{period_training}.nc'
-predictand = xr.open_dataset(predictand_filename)
-predictand = predictand[[var_target]]
-
-# Remove days with nans in the predictor
-predictor = deep4downscaling.trans.remove_days_with_nans(predictor)
-
-# Align both datasets in time
-predictor, predictand = deep4downscaling.trans.align_datasets(predictor, predictand, 'time')
-
-# Set a test set for some evaluation
-if training_experiment == 'ESD_pseudo_reality':
-    years_train = list(range(1961, 1975))
-    years_test = list(range(1975, 1980+1))
-elif training_experiment == 'Emulator_hist_future':
-    years_train = list(range(1961, 1980+1)) + list(range(2080, 2090))
-    years_test = list(range(2090, 2099+1))
-
-x_train = predictor.sel(time=np.isin(predictor['time'].dt.year, years_train))
-y_train = predictand.sel(time=np.isin(predictand['time'].dt.year, years_train))
-
-x_test = predictor.sel(time=np.isin(predictor['time'].dt.year, years_test))
-y_test = predictand.sel(time=np.isin(predictand['time'].dt.year, years_test))
-
-# Standardize the predictor
-x_train_stand = deep4downscaling.trans.standardize(data_ref=x_train, data=x_train)
-
-# Flat the predictand
-if domain == 'ALPS':
-    spatial_dims = ('x', 'y')
-elif domain == 'NZ':
-    spatial_dims = ('lat', 'lon')
-
-y_train_stack = y_train.stack(gridpoint=spatial_dims)
-
-# Transform to numpy arrays
-x_train_stand_arr = deep4downscaling.trans.xarray_to_numpy(x_train_stand)
-y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stack)
-#######################################################################################################
-
-#######################################################################################################
-# Load the model
-model_name = f'DeepESD_{domain}_{training_experiment}_{var_target}'
-model = deep4downscaling.deep.models.DeepESDtas(x_shape=x_train_stand_arr.shape,
-                                                y_shape=y_train_arr.shape,
-                                                filters_last_conv=1,
-                                                stochastic=False)
-
-# Load the model
-model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt'))
-#######################################################################################################
-
-#######################################################################################################
-# Get settings for the chosen experiments
-period, mode, same_gcm_as_train = evaluation_experiment_settings[training_experiment][evaluation_experiment]
-period_date = period_dates[period]
-if same_gcm_as_train:
-    gcm_name = gcm_train[domain]
-else:
-    gcm_name = gcm_eval[domain]
+import models
+from config import (
+    MODEL_PATH, SUBMISSION_PATH, EVALUATION_EXPERIMENT_SETTINGS,
+    PERIOD_DATES, GCM_TRAIN, GCM_EVAL, DATA_PATH
+)
+from data_utils import (
+    load_predictor_and_predictand, load_orography, preprocess_data,
+    split_train_test, get_spatial_dims
+)
 
 
-if period == 'mid_end_century':
-    predictor_evaluation_filename_mid_century = f'{DATA_PATH}/{domain}_domain/test/mid_century/predictors/{mode}/{gcm_name}_2041-2060.nc'
-    predictor_evaluation_mid = xr.open_dataset(predictor_evaluation_filename_mid_century)
+def load_evaluation_predictor(domain: str, period: str, mode: str, 
+                             same_gcm_as_train: bool):
+    """Load predictor data for evaluation."""
+    gcm_name = GCM_TRAIN[domain] if same_gcm_as_train else GCM_EVAL[domain]
     
-    predictor_evaluation_filename_end_century = f'{DATA_PATH}/{domain}_domain/test/end_century/predictors/{mode}/{gcm_name}_2080-2099.nc'
-    predictor_evaluation_end = xr.open_dataset(predictor_evaluation_filename_end_century)
+    if period == 'mid_end_century':
+        mid_file = f'{DATA_PATH}/{domain}/test/mid_century/predictors/{mode}/{gcm_name}_2041-2060.nc'
+        end_file = f'{DATA_PATH}/{domain}/test/end_century/predictors/{mode}/{gcm_name}_2080-2099.nc'
+        
+        predictor_mid = xr.open_dataset(mid_file)
+        predictor_end = xr.open_dataset(end_file)
+        return xr.merge([predictor_mid, predictor_end])
+    else:
+        period_date = PERIOD_DATES[period]
+        filename = f'{DATA_PATH}/{domain}/test/{period}/predictors/{mode}/{gcm_name}_{period_date}.nc'
+        return xr.open_dataset(filename)
 
-    predictor_evaluation = xr.merge([predictor_evaluation_mid, predictor_evaluation_end])
-else:
-    predictor_evaluation_filename = f'{DATA_PATH}/{domain}_domain/test/{period}/predictors/{mode}/{gcm_name}_{period_date}.nc'
-    predictor_evaluation = xr.open_dataset(predictor_evaluation_filename)
 
-# Standardize the predictor
-predictor_evaluation_stand = deep4downscaling.trans.standardize(data_ref=x_train, data=predictor_evaluation)
+def main(var_target: str, use_orography: str, domain: str, 
+         training_experiment: str, evaluation_experiment: str):
+    """Evaluate the DeepESD model."""
+    
+    # Convert orography flag to boolean
+    use_orog = bool(use_orography)
+    
+    # Load training data (for model initialization and statistics)
+    print(f"Loading training data for {domain} domain, {var_target} variable...")
+    predictor, predictand = load_predictor_and_predictand(
+        DATA_PATH, domain, training_experiment, var_target
+    )
+    orog_data = load_orography(DATA_PATH, domain, training_experiment, use_orog)
+    
+    # Preprocess
+    predictor, predictand, orog_data_stand = preprocess_data(
+        predictor, predictand, domain, orog_data
+    )
+    
+    # Split and prepare training data
+    x_train, y_train, _, _ = split_train_test(predictor, predictand, training_experiment)
+    x_train_standardized = deep4downscaling.trans.standardize(data_ref=x_train, data=x_train)
+    
+    spatial_dims = get_spatial_dims(domain)
+    y_train_stacked = y_train.stack(gridpoint=spatial_dims)
+    orog_data_stacked = orog_data_stand.stack(gridpoint=spatial_dims) if orog_data_stand is not None else None
+    
+    x_train_arr = deep4downscaling.trans.xarray_to_numpy(x_train_standardized)
+    y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stacked)
+    orog_data_arr = deep4downscaling.trans.xarray_to_numpy(orog_data_stacked) if orog_data_stacked is not None else None
+    
+    # Load model
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Using device: {device}")
+    
+    # Create model name (preserving original format)
+    model_name = f'DeepESD_orog{use_orography}_{domain}_{training_experiment}_{var_target}'
+    
+    model = models.DeepESD(
+        x_shape=x_train_arr.shape,
+        y_shape=y_train_arr.shape,
+        filters_last_conv=1,
+        device=device,
+        orog_data=orog_data_arr
+    )
+    model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt'))
+    print(f"Loaded model: {model_name}")
+    
+    # Get evaluation settings
+    period, mode, same_gcm_as_train = EVALUATION_EXPERIMENT_SETTINGS[training_experiment][evaluation_experiment]
+    
+    # Load evaluation predictor
+    print(f"Loading evaluation data for {evaluation_experiment}...")
+    predictor_evaluation = load_evaluation_predictor(domain, period, mode, same_gcm_as_train)
+    predictor_evaluation_stand = deep4downscaling.trans.standardize(
+        data_ref=x_train, data=predictor_evaluation
+    )
+    
+    # Create mask for mapping predictions
+    y_mask = xr.ones_like(y_train.isel(time=0))
+    
+    # Compute predictions
+    print("Computing predictions...")
+    pred_evaluation = deep4downscaling.deep.pred.compute_preds_standard(
+        x_data=predictor_evaluation_stand,
+        model=model,
+        device=device,
+        var_target=var_target,
+        mask=y_mask,
+        batch_size=16,
+        spatial_dims=spatial_dims
+    )
+    
+    # Save predictions
+    orog_label = "OROG" if use_orog else "NO_OROG"
+    training_label = training_experiment.replace(
+        "ESD_pseudo_reality", "ESD_Pseudo-Reality"
+    ).replace("Emulator_hist_future", "Emulator_Hist_Future")
+    
+    domain_dir = f"{SUBMISSION_PATH}/{domain}_Domain/{training_label}_{orog_label}/{var_target}"
+    os.makedirs(domain_dir, exist_ok=True)
+    
+    prediction_filename = f"{domain_dir}/predictions_{evaluation_experiment}.nc"
+    pred_evaluation.to_netcdf(prediction_filename)
+    print(f"Predictions saved to: {prediction_filename}")
 
-# Compute map for mapping from Torch to NetCDF
-y_mask = xr.ones_like(y_train.isel(time=0))
 
-# Set the device
-device = ('cuda' if torch.cuda.is_available() else 'cpu')
-
-# Compute predictions
-if domain == 'ALPS':
-    spatial_dims = ('x', 'y')
-elif domain == 'NZ':
-    spatial_dims = ('lat', 'lon')
-
-pred_evaluation = deep4downscaling.deep.pred.compute_preds_standard(
-                                    x_data=predictor_evaluation_stand, model=model,
-                                    device=device, var_target=var_target,
-                                    mask=y_mask, batch_size=16,
-                                    spatial_dims=spatial_dims)
-
-# Save predictions
-pred_evaluation.to_netcdf(f'{PREDS_PATH}/{model_name}_{evaluation_experiment}.nc')
-#######################################################################################################
+if __name__ == "__main__":
+    var_target = sys.argv[1]
+    use_orography = sys.argv[2]
+    domain = sys.argv[3]
+    training_experiment = sys.argv[4]
+    evaluation_experiment = sys.argv[5]
+    
+    main(var_target, use_orography, domain, training_experiment, evaluation_experiment)
