@@ -45,7 +45,8 @@ def main(var_target: str, use_orography: str, domain: str,
     """Evaluate the DeepESD model."""
     
     # Convert orography flag to boolean
-    use_orog = bool(use_orography)
+    bool_map = {"True": True, "False": False, "true": True, "false": False}
+    use_orog = bool_map.get(use_orography)
     
     # Load training data (for model initialization and statistics)
     print(f"Loading training data for {domain} domain, {var_target} variable...")
