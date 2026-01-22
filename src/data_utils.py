@@ -9,10 +9,9 @@ import deep4downscaling.trans
 
 def get_training_period(training_experiment: str) -> str:
     """Get the training period for the given experiment."""
-    period_map = {
-        'ESD_pseudo_reality': '1961-1980',
-        'Emulator_hist_future': '1961-1980_2080-2099',
-    }
+    
+    period_map = {'ESD_pseudo_reality': '1961-1980',
+                  'Emulator_hist_future': '1961-1980_2080-2099'}
     if training_experiment not in period_map:
         raise ValueError(f'Invalid training experiment: {training_experiment}')
     return period_map[training_experiment]
@@ -52,40 +51,24 @@ def load_predictor_and_predictand(data_path: str, domain: str,
     return predictor, predictand
 
 
-def load_orography(data_path: str, domain: str, training_experiment: str, use_orog: bool):
-    """Load orography data if requested."""
-    if not use_orog:
-        return None
-    
-    orog_path = f'{data_path}/{domain}/train/{training_experiment}/predictors/Static_fields.nc'
-    return xr.open_dataset(orog_path)[['orog']]
-
-
 def preprocess_data(predictor: xr.Dataset, predictand: xr.Dataset, 
-                    domain: str, orog_data: xr.Dataset = None):
+                    domain: str):
     """Remove NaNs and align datasets."""
     predictor = deep4downscaling.trans.remove_days_with_nans(predictor)
     predictor, predictand = deep4downscaling.trans.align_datasets(predictor, predictand, 'time')
     
-    # Standardize orography
-    if orog_data is not None:
-        orog_data_stand = orog_data / orog_data.max()
-        orog_data_stand = orog_data_stand.where(orog_data_stand >= 0, 0)
-    else:
-        orog_data_stand = None
-    
-    return predictor, predictand, orog_data_stand
+    return predictor, predictand
 
 
 def split_train_test(predictor: xr.Dataset, predictand: xr.Dataset, 
                      training_experiment: str):
     """Split data into training and test sets."""
     if training_experiment == 'ESD_pseudo_reality':
-        years_train = list(range(1961, 1975))
-        years_test = list(range(1975, 1981))
+        years_train = list(range(1961, 1980))
+        years_test = list(range(1980, 1981))
     elif training_experiment == 'Emulator_hist_future':
-        years_train = list(range(1961, 1981)) + list(range(2080, 2090))
-        years_test = list(range(2090, 2100))
+        years_train = list(range(1961, 1981)) + list(range(2080, 2098))
+        years_test = list(range(2098, 2100))
     else:
         raise ValueError(f'Invalid training experiment: {training_experiment}')
     
@@ -95,4 +78,3 @@ def split_train_test(predictor: xr.Dataset, predictand: xr.Dataset,
     y_test = predictand.sel(time=np.isin(predictand['time'].dt.year, years_test))
     
     return x_train, y_train, x_test, y_test
-

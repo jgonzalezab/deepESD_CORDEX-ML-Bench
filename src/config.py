@@ -18,28 +18,26 @@ EVALUATION_EXPERIMENT_SETTINGS = {
 }
 
 # Map periods to dates
-PERIOD_DATES = {
-    "historical": "1981-2000",
-    "mid_century": "2041-2060",
-    "end_century": "2080-2099",
-    "mid_end_century": ["2041-2060", "2080-2099"],
-}
+PERIOD_DATES = {"historical": "1981-2000",
+                "mid_century": "2041-2060",
+                "end_century": "2080-2099",
+                "mid_end_century": ["2041-2060", "2080-2099"]}
 
 # GCM selection by domain and training setup
 GCM_TRAIN = {"NZ": "ACCESS-CM2", "ALPS": "CNRM-CM5", "SA": "ACCESS-CM2"}
 GCM_EVAL = {"NZ": "EC-Earth3", "ALPS": "MPI-ESM-LR", "SA": "NorESM2-MM"}
 
 # Training hyperparameters
-TRAINING_CONFIG = {
-    "batch_size": 64,
-    "num_epochs": 10000,
-    "patience_early_stopping": 20,
-    "learning_rate": 0.0001,
-    "validation_split": 0.1,
-}
+TRAINING_CONFIG = {"batch_size": 64,
+                   "num_epochs": 10000,
+                   "patience_early_stopping": 60,
+                   "learning_rate": 0.0001,
+                   "validation_split": 0.1}
 
 # Paths
 DATA_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/Bench-data"
 MODEL_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/models"
 SUBMISSION_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/submission"
+TEMPLATES_PATH = "/gpfs/projects/meteo/WORK/gonzabad/ml-benchmark/format_predictions/templates"
+ASYM_PATH = '/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/asym'
 

@@ -17,7 +17,7 @@ from config import (
     PERIOD_DATES, GCM_TRAIN, GCM_EVAL, DATA_PATH
 )
 from data_utils import (
-    load_predictor_and_predictand, load_orography, preprocess_data,
+    load_predictor_and_predictand, preprocess_data,
     split_train_test, get_spatial_dims
 )
 
@@ -40,24 +40,19 @@ def load_evaluation_predictor(domain: str, period: str, mode: str,
         return xr.open_dataset(filename)
 
 
-def main(var_target: str, use_orography: str, domain: str, 
+def main(var_target: str, domain: str, 
          training_experiment: str, evaluation_experiment: str):
     """Evaluate the DeepESD model."""
-    
-    # Convert orography flag to boolean
-    bool_map = {"True": True, "False": False, "true": True, "false": False}
-    use_orog = bool_map.get(use_orography)
     
     # Load training data (for model initialization and statistics)
     print(f"Loading training data for {domain} domain, {var_target} variable...")
     predictor, predictand = load_predictor_and_predictand(
         DATA_PATH, domain, training_experiment, var_target
     )
-    orog_data = load_orography(DATA_PATH, domain, training_experiment, use_orog)
     
     # Preprocess
-    predictor, predictand, orog_data_stand = preprocess_data(
-        predictor, predictand, domain, orog_data
+    predictor, predictand = preprocess_data(
+        predictor, predictand, domain
     )
     
     # Split and prepare training data
@@ -66,25 +61,23 @@ def main(var_target: str, use_orography: str, domain: str,
     
     spatial_dims = get_spatial_dims(domain)
     y_train_stacked = y_train.stack(gridpoint=spatial_dims)
-    orog_data_stacked = orog_data_stand.stack(gridpoint=spatial_dims) if orog_data_stand is not None else None
     
     x_train_arr = deep4downscaling.trans.xarray_to_numpy(x_train_standardized)
     y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stacked)
-    orog_data_arr = deep4downscaling.trans.xarray_to_numpy(orog_data_stacked) if orog_data_stacked is not None else None
     
     # Load model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
-    # Create model name (preserving original format)
-    model_name = f'DeepESD_orog{use_orography}_{domain}_{training_experiment}_{var_target}'
+    # Create model name
+    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
     
     model = models.DeepESD(
         x_shape=x_train_arr.shape,
         y_shape=y_train_arr.shape,
         filters_last_conv=1,
         device=device,
-        orog_data=orog_data_arr
+        var_target=var_target
     )
     model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt'))
     print(f"Loaded model: {model_name}")
@@ -115,12 +108,11 @@ def main(var_target: str, use_orography: str, domain: str,
     )
     
     # Save predictions
-    orog_label = "OROG" if use_orog else "NO_OROG"
     training_label = training_experiment.replace(
         "ESD_pseudo_reality", "ESD_Pseudo-Reality"
     ).replace("Emulator_hist_future", "Emulator_Hist_Future")
     
-    domain_dir = f"{SUBMISSION_PATH}/{domain}_Domain/{training_label}_{orog_label}/{var_target}"
+    domain_dir = f"{SUBMISSION_PATH}/{domain}_Domain/{training_label}/{var_target}"
     os.makedirs(domain_dir, exist_ok=True)
     
     prediction_filename = f"{domain_dir}/predictions_{evaluation_experiment}.nc"
@@ -130,9 +122,8 @@ def main(var_target: str, use_orography: str, domain: str,
 
 if __name__ == "__main__":
     var_target = sys.argv[1]
-    use_orography = sys.argv[2]
-    domain = sys.argv[3]
-    training_experiment = sys.argv[4]
-    evaluation_experiment = sys.argv[5]
+    domain = sys.argv[2]
+    training_experiment = sys.argv[3]
+    evaluation_experiment = sys.argv[4]
     
-    main(var_target, use_orography, domain, training_experiment, evaluation_experiment)
+    main(var_target, domain, training_experiment, evaluation_experiment)
