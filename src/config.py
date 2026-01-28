@@ -3,17 +3,19 @@
 # Experiment settings
 EVALUATION_EXPERIMENT_SETTINGS = {
     "ESD_pseudo_reality": {
-        "PP_cross_validation": ("historical", "perfect", True),
+        "Perfect_cross_validation": ("historical", "perfect", True),
         "Imperfect_cross_validation": ("historical", "imperfect", True),
-        "Extrapolation_perfect": ("mid_end_century", "perfect", True),
-        "Extrapolation_imperfect": ("mid_end_century", "imperfect", True),
+        "Perfect_extrapolation": ("mid_end_century", "perfect", True),
+        "Imperfect_extrapolation": ("mid_end_century", "imperfect", True),
+        "Perfect_extrapolation_GCM_transferability": ("mid_end_century", "perfect", False),
     },
     "Emulator_hist_future": {
-        "PP_cross_validation": ("historical", "perfect", True),
+        "Perfect_cross_validation": ("historical", "perfect", True),
         "Imperfect_cross_validation": ("historical", "imperfect", True),
-        "Extrapolation_perfect": ("mid_end_century", "perfect", True),
-        "Extrapolation_perfect_hard": ("mid_end_century", "perfect", False),
-        "Extrapolation_imperfect_hard": ("mid_end_century", "imperfect", False),
+        "Perfect_interpolation": ("mid_century", "perfect", True),
+        "Imperfect_interpolation": ("mid_century", "imperfect", True),
+        "Perfect_interpolation_GCM_transferability": ("mid_century", "perfect", False),
+        "Imperfect_interpolation_GCM_transferability": ("mid_century", "imperfect", False),
     },
 }
 
@@ -40,4 +42,6 @@ MODEL_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/models"
 SUBMISSION_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/submission"
 TEMPLATES_PATH = "/gpfs/projects/meteo/WORK/gonzabad/ml-benchmark/format_predictions/templates"
 ASYM_PATH = '/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/asym'
+VALIDATION_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/data/validation"
+FIGS_PATH = "/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/figs"
 

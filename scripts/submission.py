@@ -100,7 +100,7 @@ def run_prediction(domain, experiment, predictor_path):
         
         # Ensure coordinates and attributes match template
         pred_da.attrs = ds_template[var].attrs
-        ds_out[var] = pred_da
+        ds_out[var] = pred_da[var]
 
     return ds_out
 

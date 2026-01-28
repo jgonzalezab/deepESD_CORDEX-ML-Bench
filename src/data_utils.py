@@ -61,14 +61,29 @@ def preprocess_data(predictor: xr.Dataset, predictand: xr.Dataset,
 
 
 def split_train_test(predictor: xr.Dataset, predictand: xr.Dataset, 
-                     training_experiment: str):
-    """Split data into training and test sets."""
+                     training_experiment: str, validation_mode: bool = True):
+    """Split data into training and test sets.
+    
+    Args:
+        predictor: Predictor dataset.
+        predictand: Predictand dataset.
+        training_experiment: Training experiment name.
+        validation_mode: If True, reserve years for validation. If False, use all data for training.
+    """
     if training_experiment == 'ESD_pseudo_reality':
-        years_train = list(range(1961, 1980))
-        years_test = list(range(1980, 1981))
+        if validation_mode:
+            years_train = list(range(1961, 1980))
+            years_test = list(range(1980, 1981))
+        else:
+            years_train = list(range(1961, 1981))
+            years_test = []
     elif training_experiment == 'Emulator_hist_future':
-        years_train = list(range(1961, 1981)) + list(range(2080, 2098))
-        years_test = list(range(2098, 2100))
+        if validation_mode:
+            years_train = list(range(1961, 1981)) + list(range(2080, 2098))
+            years_test = list(range(2098, 2100))
+        else:
+            years_train = list(range(1961, 1981)) + list(range(2080, 2100))
+            years_test = []
     else:
         raise ValueError(f'Invalid training experiment: {training_experiment}')
     

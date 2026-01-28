@@ -33,7 +33,8 @@ def main(var_target: str, domain: str, training_experiment: str):
     predictor, predictand = preprocess_data(predictor, predictand, domain)
     
     # Split into train and test
-    x_train, y_train, _, _ = split_train_test(predictor, predictand, training_experiment)
+    x_train, y_train, _, _ = split_train_test(predictor, predictand, training_experiment,
+                                              validation_mode=True) #Change to False for full training
     
     # Standardize predictor
     x_train_standardized = deep4downscaling.trans.standardize(data_ref=x_train, data=x_train)

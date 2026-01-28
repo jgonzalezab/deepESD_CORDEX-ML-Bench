@@ -10,8 +10,8 @@ sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/src"
 
 import deep4downscaling.trans
 import deep4downscaling.deep.pred
+from deep4downscaling.deep.models.deepesd import DeepESDpr, DeepESDtas
 
-import models
 from config import (
     MODEL_PATH, SUBMISSION_PATH, EVALUATION_EXPERIMENT_SETTINGS,
     PERIOD_DATES, GCM_TRAIN, GCM_EVAL, DATA_PATH
@@ -72,14 +72,21 @@ def main(var_target: str, domain: str,
     # Create model name
     model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
     
-    model = models.DeepESD(
-        x_shape=x_train_arr.shape,
-        y_shape=y_train_arr.shape,
-        filters_last_conv=1,
-        device=device,
-        var_target=var_target
-    )
-    model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt'))
+    if var_target == 'pr':
+        model = DeepESDpr(x_shape=x_train_arr.shape, 
+                          y_shape=y_train_arr.shape, 
+                          filters_last_conv=1, 
+                          stochastic=False,
+                          last_relu=False)
+    else:
+        model = DeepESDtas(x_shape=x_train_arr.shape, 
+                           y_shape=y_train_arr.shape, 
+                           filters_last_conv=1, 
+                           stochastic=False)
+    
+    model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt', map_location=device))
+    model.to(device)
+    model.eval()
     print(f"Loaded model: {model_name}")
     
     # Get evaluation settings
