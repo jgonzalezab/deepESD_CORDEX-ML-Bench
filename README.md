@@ -31,21 +31,27 @@ python scripts/predict_validation.py pr ALPS ESD_pseudo_reality
 
 Run the evaluation suite to generate a comprehensive PDF report with spatial maps, boxplots, and spectral analysis.
 
-1.  Open `eval/run_all_eval.py` and configure the `params` dictionary:
-    ```python
-    params = {
-        'VAR_TARGET': 'pr',
-        'TRAINING_EXPERIMENT': 'ESD_pseudo_reality',
-        'DOMAIN': 'ALPS'
-    }
-    ```
-2.  Run the master evaluation script:
-    ```bash
-    python eval/run_all_eval.py
-    ```
-The resulting PDF will be saved in the `figs/` directory.
+The evaluation script can be configured via environment variables or by editing the script:
 
-### 4. Final Training (Full Dataset)
+```bash
+# Using environment variables (recommended)
+VAR_TARGET=pr DOMAIN=ALPS TRAINING_EXPERIMENT=ESD_pseudo_reality python eval/run_all_eval.py
+```
+
+Alternatively, you can open `eval/run_all_eval.py` and configure the `params` dictionary directly. The resulting PDF will be saved in the `figs/` directory.
+
+### 4. Batch Processing (Automation)
+
+For running both prediction and evaluation for multiple variables, domains, or experiments at once, use the batch processing script:
+
+```bash
+# Run for multiple configurations
+python scripts/run_batch_eval.py --vars pr tas --domains ALPS NZ --exps ESD_pseudo_reality
+```
+
+This script will sequentially run `predict_validation.py` and `run_all_eval.py` for each combination of the specified parameters.
+
+### 5. Final Training (Full Dataset)
 
 Once you are satisfied with the model's performance, modify `scripts/train.py` to use 100% of the training data:
 
@@ -65,6 +71,7 @@ python scripts/submission.py
 - `scripts/`: Main execution scripts.
     - `train.py`: Model training script.
     - `predict_validation.py`: Generates predictions on the validation set.
+    - `run_batch_eval.py`: Automates prediction and evaluation for multiple configs.
     - `submission.py`: Generates the final submission ZIP for the benchmark.
 - `eval/`: Diagnostic and reporting scripts.
     - `run_all_eval.py`: Master script to run all evaluations and merge PDFs.

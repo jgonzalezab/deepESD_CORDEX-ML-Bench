@@ -4,11 +4,11 @@ import os
 import subprocess
 import sys
 
-# Parameters - change these as needed
+# Parameters - change these as needed or use environment variables
 params = {
-    'VAR_TARGET': 'pr',
-    'TRAINING_EXPERIMENT': 'ESD_pseudo_reality',
-    'DOMAIN': 'ALPS'
+    'VAR_TARGET': os.environ.get('VAR_TARGET', 'pr'),
+    'TRAINING_EXPERIMENT': os.environ.get('TRAINING_EXPERIMENT', 'ESD_pseudo_reality'),
+    'DOMAIN': os.environ.get('DOMAIN', 'ALPS')
 }
 
 # Paths to the scripts
@@ -16,7 +16,8 @@ eval_dir = os.path.dirname(os.path.abspath(__file__))
 scripts = [
     os.path.join(eval_dir, 'standard_metrics.py'),
     os.path.join(eval_dir, 'psd_comparison.py'),
-    os.path.join(eval_dir, 'daily_comparison.py')
+    os.path.join(eval_dir, 'daily_comparison.py'),
+    os.path.join(eval_dir, 'dist_comparison.py')
 ]
 
 
@@ -67,15 +68,17 @@ def main():
         try:
             subprocess.run([sys.executable, script], env=env, check=True)
             
-            # Construct the expected PDF path
+            # Construct the expected PDF path (dist_comparison produces no PDF)
             if 'standard_metrics' in script:
                 pdf_name = f"{model_name}_metrics_report.pdf"
             elif 'psd_comparison' in script:
                 pdf_name = f"{model_name}_psd_comparison.pdf"
             elif 'daily_comparison' in script:
                 pdf_name = f"{model_name}_daily_comparison.pdf"
-            
-            output_pdfs.append(os.path.join(FIGS_PATH, pdf_name))
+            else:
+                pdf_name = None  # e.g. dist_comparison
+            if pdf_name is not None:
+                output_pdfs.append(os.path.join(FIGS_PATH, pdf_name))
             
         except subprocess.CalledProcessError as e:
             print(f"Error running {script}: {e}")

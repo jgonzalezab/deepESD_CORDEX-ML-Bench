@@ -41,6 +41,7 @@ groundtruth = xr.open_dataset(groundtruth_path)
 # Compute diagnostics
 rmse = eval_diagnostics.rmse(groundtruth, predictions, var=var_target, dim='time')
 bias_mean = eval_diagnostics.bias_index(groundtruth, predictions, eval_indices.mean, var=var_target)
+wasserstein = eval_diagnostics.wasserstein_distance(groundtruth, predictions, var=var_target, spatial=True)
 
 if var_target == 'tasmax':
     extra_metrics = {
@@ -55,7 +56,7 @@ elif var_target == 'pr':
 else:
     raise ValueError('Unsupported variable target')
 
-diagnostics = {'rmse': rmse, 'bias_mean': bias_mean, **extra_metrics}
+diagnostics = {'rmse': rmse, 'bias_mean': bias_mean, 'wasserstein': wasserstein, **extra_metrics}
 
 # Metric configuration
 metric_titles = {
@@ -64,7 +65,8 @@ metric_titles = {
     'bias_p98': 'Bias (p98)',
     'bias_txx': 'Bias (TXx)',
     'bias_sdii': 'Bias (SDII)',
-    'bias_rx1day': 'Bias (RX1day)'
+    'bias_rx1day': 'Bias (RX1day)',
+    'wasserstein': 'Wasserstein Distance'
 }
 
 bias_metrics = {'bias_mean', 'bias_p98', 'bias_txx', 'bias_sdii', 'bias_rx1day'}
@@ -75,12 +77,14 @@ METRIC_COLORBAR_LIMITS = {
         "bias_mean": {"vmin": -1.0, "vmax": 1.0},
         "bias_p98": {"vmin": -3.0, "vmax": 3.0},
         "bias_txx": {"vmin": -3.0, "vmax": 3.0},
+        "wasserstein": {"vmin": 0.0, "vmax": 2.0},
     },
     "pr": {
         "rmse": {"vmin": 0.0, "vmax": 12.0},
         "bias_mean": {"vmin": -2.0, "vmax": 2.0},
         "bias_sdii": {"vmin": -2.0, "vmax": 2.0},
         "bias_rx1day": {"vmin": -40.0, "vmax": 40.0},
+        "wasserstein": {"vmin": 0.0, "vmax": 5.0},
     },
 }
 
@@ -90,12 +94,14 @@ METRIC_BOXPLOT_LIMITS = {
         "bias_mean": {"ymin": -1.0, "ymax": 1.0},
         "bias_p98": {"ymin": -3.0, "ymax": 3.0},
         "bias_txx": {"ymin": -3.0, "ymax": 3.0},
+        "wasserstein": {"ymin": 0.0, "ymax": 2.0},
     },
     "pr": {
         "rmse": {"ymin": 0.0, "ymax": 12.0},
         "bias_mean": {"ymin": -2.0, "ymax": 2.0},
         "bias_sdii": {"ymin": -2.0, "ymax": 2.0},
         "bias_rx1day": {"ymin": -40.0, "ymax": 40.0},
+        "wasserstein": {"ymin": 0.0, "ymax": 5.0},
     },
 }
 
