@@ -73,10 +73,10 @@ for var_target in "${var_targets[@]}"; do
     done
 done
 
-echo "=========================================="
-echo "Training finished. Starting submission generation..."
-echo "=========================================="
-echo ""
+# echo "=========================================="
+# echo "Training finished. Starting submission generation..."
+# echo "=========================================="
+# echo ""
 
 # # Run submission generation
 # python scripts/submission.py
