@@ -8,7 +8,8 @@ import sys
 params = {
     'VAR_TARGET': os.environ.get('VAR_TARGET', 'pr'),
     'TRAINING_EXPERIMENT': os.environ.get('TRAINING_EXPERIMENT', 'ESD_pseudo_reality'),
-    'DOMAIN': os.environ.get('DOMAIN', 'ALPS')
+    'DOMAIN': os.environ.get('DOMAIN', 'ALPS'),
+    'USE_OROGRAPHY': os.environ.get('USE_OROGRAPHY', 'false').lower() in ('true', '1', 'yes', 'on')
 }
 
 # Paths to the scripts
@@ -51,7 +52,7 @@ def main():
     """Run all evaluation scripts and merge the results."""
     # Update environment variables
     env = os.environ.copy()
-    env.update(params)
+    env.update({k: str(v).lower() if k == 'USE_OROGRAPHY' else str(v) for k, v in params.items()})
 
     output_pdfs = []
     

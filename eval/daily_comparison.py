@@ -18,12 +18,14 @@ from config import VALIDATION_PATH, FIGS_PATH
 var_target = os.getenv('VAR_TARGET', 'pr')
 training_experiment = os.getenv('TRAINING_EXPERIMENT', 'ESD_pseudo_reality')
 domain = os.getenv('DOMAIN', 'ALPS')
+use_orography = os.getenv('USE_OROGRAPHY', 'false').lower() in ('true', '1', 'yes', 'on')
 
 # Selected days for visual comparison
 selected_days = ['1980-01-15', '1980-07-15'] if training_experiment == 'ESD_pseudo_reality' else ['2098-01-15', '2098-07-15']
 
 # Model name
-model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
+orog_suffix = '-orog' if use_orography else ''
+model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}{orog_suffix}'
 
 # Load predictions and ground truth
 predictions_path = os.path.join(VALIDATION_PATH, f'{model_name}_predictions.nc')

@@ -16,10 +16,10 @@ sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deep4downscaling")
 
 import deep4downscaling.trans
 import deep4downscaling.deep.pred
-from deep4downscaling.deep.models.deepesd import DeepESDpr, DeepESDtas
+from models import DeepESDpr, DeepESDtas
 
 from config import MODEL_PATH, DATA_PATH, SUBMISSION_PATH, TEMPLATES_PATH
-from data_utils import load_predictor_and_predictand, preprocess_data, split_train_test
+from data_utils import load_predictor_and_predictand, preprocess_data, split_train_test, load_orography
 
 # Set the device
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -32,7 +32,7 @@ DOMAIN_INFO = {'ALPS': {'spatial_dims': ('x', 'y')},
 # Experiments to run
 EXPERIMENTS = ['ESD_pseudo_reality', 'Emulator_hist_future']
 
-def run_prediction(domain, experiment, predictor_path):
+def run_prediction(domain, experiment, predictor_path, use_orography: bool = False):
     """Computes the predictions for a specific predictor file."""
     ds_test = xr.open_dataset(predictor_path)
     if domain == 'SA': 
@@ -62,20 +62,32 @@ def run_prediction(domain, experiment, predictor_path):
         y_train_stacked = y_train.stack(gridpoint=spatial_dims)
         y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stacked)
 
+        # Load orography if needed
+        if use_orography:
+            orog = load_orography(DATA_PATH, domain, experiment)
+            orog = orog / orog.max()  # Normalize to 0-1
+            orog_arr = torch.tensor(deep4downscaling.trans.xarray_to_numpy(orog),
+                                    dtype=torch.float32)
+        else:
+            orog_arr = None
+
         # Initialize and load model
         if var == 'pr':
             model = DeepESDpr(x_shape=x_train_arr.shape,
                               y_shape=y_train_arr.shape,
                               filters_last_conv=1,
                               stochastic=False,
-                              last_relu=False)
+                              last_relu=False,
+                              orography=orog_arr)
         else:
             model = DeepESDtas(x_shape=x_train_arr.shape,
                                y_shape=y_train_arr.shape,
                                filters_last_conv=1,
-                               stochastic=False)
+                               stochastic=False,
+                               orography=orog_arr)
         
-        model_name = f'DeepESD_{experiment}_{domain}_{var}.pt'
+        model_suffix = '-orog' if use_orography else ''
+        model_name = f'DeepESD_{experiment}_{domain}_{var}{model_suffix}.pt'
         model_path = os.path.join(MODEL_PATH, model_name)
         model.load_state_dict(torch.load(model_path, weights_only=True, map_location=DEVICE))
         model.eval()
@@ -105,6 +117,13 @@ def run_prediction(domain, experiment, predictor_path):
     return ds_out
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate submission predictions.")
+    parser.add_argument("--use-orography", action="store_true",
+                        help="Use models trained with orography as co-variable")
+    args = parser.parse_args()
+    use_orography = args.use_orography
+
     # Create the output base directory
     os.makedirs(SUBMISSION_PATH, exist_ok=True)
 
@@ -131,7 +150,7 @@ if __name__ == "__main__":
             for experiment in EXPERIMENTS:
                 print(f"Predicting {filename} for {experiment} in {domain}...")
                 
-                ds_preds = run_prediction(domain, experiment, pred_path)
+                ds_preds = run_prediction(domain, experiment, pred_path, use_orography)
                 
                 training_label = experiment.replace("ESD_pseudo_reality", "ESD_Pseudo-Reality").replace("Emulator_hist_future", "Emulator_Hist_Future")
                 

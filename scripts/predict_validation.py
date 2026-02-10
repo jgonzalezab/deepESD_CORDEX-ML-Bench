@@ -10,14 +10,14 @@ sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/src"
 
 import deep4downscaling.trans
 import deep4downscaling.deep.pred
-from deep4downscaling.deep.models.deepesd import DeepESDpr, DeepESDtas
+from models import DeepESDpr, DeepESDtas
 
 from config import MODEL_PATH, DATA_PATH, VALIDATION_PATH
 from data_utils import (load_predictor_and_predictand, preprocess_data,
-                        split_train_test, get_spatial_dims)
+                        split_train_test, get_spatial_dims, load_orography)
 
 
-def main(var_target: str, domain: str, training_experiment: str):
+def main(var_target: str, domain: str, training_experiment: str, use_orography: bool = False):
     """Compute predictions on validation set."""
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -49,20 +49,32 @@ def main(var_target: str, domain: str, training_experiment: str):
     y_train_stacked = y_train.stack(gridpoint=spatial_dims)
     y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stacked)
     
+    # Load orography if needed
+    if use_orography:
+        orog = load_orography(DATA_PATH, domain, training_experiment)
+        orog = orog / orog.max()  # Normalize to 0-1
+        orog_arr = torch.tensor(deep4downscaling.trans.xarray_to_numpy(orog),
+                               dtype=torch.float32)
+    else:
+        orog_arr = None
+    
     # Initialize and load model
     if var_target == 'pr':
         model = DeepESDpr(x_shape=x_train_arr.shape,
                           y_shape=y_train_arr.shape,
                           filters_last_conv=1,
                           stochastic=False,
-                          last_relu=False)
+                          last_relu=False,
+                          orography=orog_arr)
     else:
         model = DeepESDtas(x_shape=x_train_arr.shape,
                            y_shape=y_train_arr.shape,
                            filters_last_conv=1,
-                           stochastic=False)
+                           stochastic=False,
+                           orography=orog_arr)
     
-    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}.pt'
+    model_suffix = '-orog' if use_orography else ''
+    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}{model_suffix}.pt'
     model_path = os.path.join(MODEL_PATH, model_name)
     
     if not os.path.exists(model_path):
@@ -97,7 +109,8 @@ def main(var_target: str, domain: str, training_experiment: str):
         var_target: pred_da[var_target]
     })
     
-    output_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
+    output_suffix = '-orog' if use_orography else ''
+    output_name = f'DeepESD_{training_experiment}_{domain}_{var_target}{output_suffix}'
     pred_path = os.path.join(VALIDATION_PATH, f'{output_name}_predictions.nc')
     gt_path = os.path.join(VALIDATION_PATH, f'{output_name}_groundtruth.nc')
     
@@ -111,13 +124,15 @@ def main(var_target: str, domain: str, training_experiment: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: python predict_validation.py <var_target> <domain> <training_experiment>")
+    if len(sys.argv) < 4:
+        print("Usage: python predict_validation.py <var_target> <domain> <training_experiment> [use_orography]")
         print("Example: python predict_validation.py pr ALPS ESD_pseudo_reality")
+        print("Example: python predict_validation.py pr ALPS ESD_pseudo_reality true")
         sys.exit(1)
     
     var_target = sys.argv[1]
     domain = sys.argv[2]
     training_experiment = sys.argv[3]
+    use_orography = sys.argv[4].lower() in ('true', '1', 'yes', 'on') if len(sys.argv) > 4 else False
     
-    main(var_target, domain, training_experiment)
+    main(var_target, domain, training_experiment, use_orography)

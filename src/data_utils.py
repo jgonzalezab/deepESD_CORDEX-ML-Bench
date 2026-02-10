@@ -93,3 +93,12 @@ def split_train_test(predictor: xr.Dataset, predictand: xr.Dataset,
     y_test = predictand.sel(time=np.isin(predictand['time'].dt.year, years_test))
     
     return x_train, y_train, x_test, y_test
+
+def load_orography(data_path: str, domain: str, training_experiment: str):
+    """Load the orography data."""
+    period_training = get_training_period(training_experiment)
+    gcm_name = get_gcm_name(domain)
+    orog_path = f'{data_path}/{domain}/train/{training_experiment}/predictors/Static_fields.nc'
+    orog = xr.open_dataset(orog_path)
+    orog = orog[['orog']]
+    return orog

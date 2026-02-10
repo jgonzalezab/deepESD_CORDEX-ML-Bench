@@ -11,14 +11,13 @@ import deep4downscaling.trans
 import deep4downscaling.deep.loss
 import deep4downscaling.deep.utils
 import deep4downscaling.deep.train
-from deep4downscaling.deep.models.deepesd import DeepESDpr, DeepESDtas
+from models import DeepESDpr, DeepESDtas
 
 from config import MODEL_PATH, DATA_PATH, TRAINING_CONFIG, ASYM_PATH
 from data_utils import (load_predictor_and_predictand, preprocess_data,
-                        split_train_test, get_spatial_dims)
+                        split_train_test, get_spatial_dims, load_orography)
 
-
-def main(var_target: str, domain: str, training_experiment: str):
+def main(var_target: str, domain: str, training_experiment: str, use_orography: bool):
     """Train the DeepESD model."""
     
     # Setup model and training
@@ -29,12 +28,21 @@ def main(var_target: str, domain: str, training_experiment: str):
     print(f"Loading data for {domain} domain, {var_target} variable...")
     predictor, predictand = load_predictor_and_predictand(DATA_PATH, domain, training_experiment, var_target)
     
+    # Load and normalize the orography data
+    if use_orography:
+        orog = load_orography(DATA_PATH, domain, training_experiment)
+        orog = orog / orog.max() # Normalize to 0-1
+        orog_arr = deep4downscaling.trans.xarray_to_numpy(orog)
+        orog_arr = torch.tensor(orog_arr, dtype=torch.float32)
+    else:
+        orog_arr = None
+
     # Preprocess
     predictor, predictand = preprocess_data(predictor, predictand, domain)
     
     # Split into train and test
     x_train, y_train, _, _ = split_train_test(predictor, predictand, training_experiment,
-                                              validation_mode=False) # Change to False for full training
+                                              validation_mode=True) # Change to False for full training
     
     # Standardize predictor
     x_train_standardized = deep4downscaling.trans.standardize(data_ref=x_train, data=x_train)
@@ -76,19 +84,23 @@ def main(var_target: str, domain: str, training_experiment: str):
                                   shuffle=True)
     
     # Create model name
-    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
-    
+    if use_orography:
+        model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}-orog'
+    else:
+        model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
     if var_target == 'pr':
         model = DeepESDpr(x_shape=x_train_arr.shape, 
                           y_shape=y_train_arr.shape, 
                           filters_last_conv=1, 
                           stochastic=False,
-                          last_relu=False)
+                          last_relu=False,
+                          orography=orog_arr)
     else:
         model = DeepESDtas(x_shape=x_train_arr.shape, 
                            y_shape=y_train_arr.shape, 
                            filters_last_conv=1, 
-                           stochastic=False)
+                           stochastic=False,
+                           orography=orog_arr)
     
     optimizer = torch.optim.Adam(model.parameters(), 
                                 lr=TRAINING_CONFIG['learning_rate'])
@@ -111,5 +123,6 @@ if __name__ == "__main__":
     var_target = sys.argv[1]
     domain = sys.argv[2]
     training_experiment = sys.argv[3]
+    use_orography = sys.argv[4].lower() in ('true', '1', 'yes', 'on')
     
-    main(var_target, domain, training_experiment)
+    main(var_target, domain, training_experiment, use_orography)

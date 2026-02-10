@@ -10,7 +10,7 @@ sys.path.append("/gpfs/projects/meteo/WORK/gonzabad/deepESD_CORDEX-ML-Bench/src"
 
 import deep4downscaling.trans
 import deep4downscaling.deep.pred
-from deep4downscaling.deep.models.deepesd import DeepESDpr, DeepESDtas
+from models import DeepESDpr, DeepESDtas
 
 from config import (
     MODEL_PATH, SUBMISSION_PATH, EVALUATION_EXPERIMENT_SETTINGS,
@@ -18,7 +18,7 @@ from config import (
 )
 from data_utils import (
     load_predictor_and_predictand, preprocess_data,
-    split_train_test, get_spatial_dims
+    split_train_test, get_spatial_dims, load_orography
 )
 
 
@@ -41,7 +41,8 @@ def load_evaluation_predictor(domain: str, period: str, mode: str,
 
 
 def main(var_target: str, domain: str, 
-         training_experiment: str, evaluation_experiment: str):
+         training_experiment: str, evaluation_experiment: str,
+         use_orography: bool = False):
     """Evaluate the DeepESD model."""
     
     # Load training data (for model initialization and statistics)
@@ -65,24 +66,36 @@ def main(var_target: str, domain: str,
     x_train_arr = deep4downscaling.trans.xarray_to_numpy(x_train_standardized)
     y_train_arr = deep4downscaling.trans.xarray_to_numpy(y_train_stacked)
     
+    # Load orography if needed
+    if use_orography:
+        orog = load_orography(DATA_PATH, domain, training_experiment)
+        orog = orog / orog.max()  # Normalize to 0-1
+        orog_arr = torch.tensor(deep4downscaling.trans.xarray_to_numpy(orog),
+                                dtype=torch.float32)
+    else:
+        orog_arr = None
+    
     # Load model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
     # Create model name
-    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}'
+    model_suffix = '-orog' if use_orography else ''
+    model_name = f'DeepESD_{training_experiment}_{domain}_{var_target}{model_suffix}'
     
     if var_target == 'pr':
         model = DeepESDpr(x_shape=x_train_arr.shape, 
                           y_shape=y_train_arr.shape, 
                           filters_last_conv=1, 
                           stochastic=False,
-                          last_relu=False)
+                          last_relu=False,
+                          orography=orog_arr)
     else:
         model = DeepESDtas(x_shape=x_train_arr.shape, 
                            y_shape=y_train_arr.shape, 
                            filters_last_conv=1, 
-                           stochastic=False)
+                           stochastic=False,
+                           orography=orog_arr)
     
     model.load_state_dict(torch.load(f'{MODEL_PATH}/{model_name}.pt', map_location=device))
     model.to(device)
@@ -128,9 +141,13 @@ def main(var_target: str, domain: str,
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 5:
+        print("Usage: python evaluation.py <var_target> <domain> <training_experiment> <evaluation_experiment> [use_orography]")
+        sys.exit(1)
     var_target = sys.argv[1]
     domain = sys.argv[2]
     training_experiment = sys.argv[3]
     evaluation_experiment = sys.argv[4]
+    use_orography = sys.argv[5].lower() in ('true', '1', 'yes', 'on') if len(sys.argv) > 5 else False
     
-    main(var_target, domain, training_experiment, evaluation_experiment)
+    main(var_target, domain, training_experiment, evaluation_experiment, use_orography)

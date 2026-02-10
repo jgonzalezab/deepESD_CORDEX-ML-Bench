@@ -11,6 +11,7 @@ def main():
     parser.add_argument("--vars", nargs="+", default=["pr"], help="Variables to process (e.g., pr tas)")
     parser.add_argument("--domains", nargs="+", default=["ALPS"], help="Domains to process (e.g., ALPS NZ SA)")
     parser.add_argument("--exps", nargs="+", default=["ESD_pseudo_reality"], help="Training experiments to process")
+    parser.add_argument("--use-orography", action="store_true", help="Use models trained with orography as co-variable")
     
     args = parser.parse_args()
 
@@ -32,8 +33,11 @@ def main():
 
                 # 1. Run prediction
                 print(f"\n[1/2] Running prediction: {os.path.basename(predict_script)}")
+                pred_args = [sys.executable, predict_script, var, domain, exp]
+                if args.use_orography:
+                    pred_args.append("true")
                 try:
-                    subprocess.run([sys.executable, predict_script, var, domain, exp], check=True)
+                    subprocess.run(pred_args, check=True)
                 except subprocess.CalledProcessError as e:
                     print(f"Error running prediction for {var} {domain} {exp}: {e}")
                     continue
@@ -44,6 +48,7 @@ def main():
                 env["VAR_TARGET"] = var
                 env["DOMAIN"] = domain
                 env["TRAINING_EXPERIMENT"] = exp
+                env["USE_OROGRAPHY"] = "true" if args.use_orography else "false"
                 
                 try:
                     subprocess.run([sys.executable, eval_script], env=env, check=True)
