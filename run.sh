@@ -22,6 +22,7 @@ conda activate pnacc-gpu
 var_targets=("pr" "tasmax")
 domains=("ALPS" "NZ" "SA")
 training_experiments=("ESD_pseudo_reality" "Emulator_hist_future")
+use_orography_values=("true" "false")
 
 # Counter for total combinations
 total_combinations=0
@@ -32,7 +33,9 @@ failed_combinations=0
 for var_target in "${var_targets[@]}"; do
     for domain in "${domains[@]}"; do
         for training_experiment in "${training_experiments[@]}"; do
-            total_combinations=$((total_combinations + 1))
+            for use_orography in "${use_orography_values[@]}"; do
+                total_combinations=$((total_combinations + 1))
+            done
         done
     done
 done
@@ -47,28 +50,31 @@ echo ""
 for var_target in "${var_targets[@]}"; do
     for domain in "${domains[@]}"; do
         for training_experiment in "${training_experiments[@]}"; do
-            completed_combinations=$((completed_combinations + 1))
+            for use_orography in "${use_orography_values[@]}"; do
+                completed_combinations=$((completed_combinations + 1))
+                
+                echo "=========================================="
+                echo "Combination $completed_combinations/$total_combinations"
+                echo "var_target: $var_target"
+                echo "domain: $domain"
+                echo "training_experiment: $training_experiment"
+                echo "use_orography: $use_orography"
+                echo "=========================================="
+                echo ""
+                
+                # Run training
+                echo "Starting training..."
+                python scripts/train.py "$var_target" "$domain" "$training_experiment" "$use_orography"
             
-            echo "=========================================="
-            echo "Combination $completed_combinations/$total_combinations"
-            echo "var_target: $var_target"
-            echo "domain: $domain"
-            echo "training_experiment: $training_experiment"
-            echo "=========================================="
-            echo ""
-            
-            # Run training
-            echo "Starting training..."
-            python scripts/train.py "$var_target" "$domain" "$training_experiment"
-        
-            # Check if training was successful
-            if [ $? -ne 0 ]; then
-                echo "ERROR: Training failed for var_target=$var_target, domain=$domain, training_experiment=$training_experiment"
-                failed_combinations=$((failed_combinations + 1))
-            else
-                echo "Training completed successfully!"
-            fi
-            echo ""
+                # Check if training was successful
+                if [ $? -ne 0 ]; then
+                    echo "ERROR: Training failed for var_target=$var_target, domain=$domain, training_experiment=$training_experiment, use_orography=$use_orography"
+                    failed_combinations=$((failed_combinations + 1))
+                else
+                    echo "Training completed successfully!"
+                fi
+                echo ""
+            done
         done
     done
 done

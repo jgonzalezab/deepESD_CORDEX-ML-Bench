@@ -25,7 +25,7 @@ from data_utils import load_predictor_and_predictand, preprocess_data, split_tra
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Mapping from domain to info
-DOMAIN_INFO = {'ALPS': {'spatial_dims': ('x', 'y')},
+DOMAIN_INFO = {'ALPS': {'spatial_dims': ('y', 'x')},
                'NZ': {'spatial_dims': ('lat', 'lon')},
                'SA': {'spatial_dims': ('lat', 'lon')}}
 

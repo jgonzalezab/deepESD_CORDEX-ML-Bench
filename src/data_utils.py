@@ -27,7 +27,7 @@ def get_gcm_name(domain: str) -> str:
 
 def get_spatial_dims(domain: str) -> tuple:
     """Get the spatial dimensions for the given domain."""
-    dims_map = {"ALPS": ('x', 'y'), "NZ": ('lat', 'lon'), "SA": ('lat', 'lon')}
+    dims_map = {"ALPS": ('y', 'x'), "NZ": ('lat', 'lon'), "SA": ('lat', 'lon')}
     if domain not in dims_map:
         raise ValueError(f'Invalid domain: {domain}')
     return dims_map[domain]
