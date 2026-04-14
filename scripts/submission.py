@@ -53,6 +53,26 @@ def run_prediction(domain, experiment, predictor_path, use_orography: bool = Fal
         predictor_train, _ = preprocess_data(predictor_train, predictand_train, domain)
         x_train, y_train, _, _ = split_train_test(predictor_train, predictand_train, experiment)
 
+        # Ensure test predictors are compatible with variables used for training.
+        train_vars = list(x_train.data_vars)
+        test_vars = list(ds_test.data_vars)
+        missing_in_test = [v for v in train_vars if v not in test_vars]
+        if missing_in_test:
+            raise ValueError(f"Test file '{predictor_path}' is not a valid predictor file for {domain}/{experiment}. "
+                             f"Missing predictor variables: {missing_in_test}")
+
+        # Keep only variables used in training and sort them with the training order.
+        shared_vars = [v for v in test_vars if v in train_vars]
+        extra_in_test = [v for v in test_vars if v not in train_vars]
+        if extra_in_test:
+            print(f"  Warning: ignoring extra variables not used in training: {extra_in_test}")
+        ds_test = deep4downscaling.trans.sort_variables(data=ds_test[shared_vars], ref=x_train)
+
+        # Final sanity check to guarantee channel order consistency for inference.
+        if list(ds_test.data_vars) != train_vars:
+            raise ValueError(f"Predictor variable order mismatch for '{predictor_path}'. "
+                             f"Expected {train_vars} but got {list(ds_test.data_vars)}")
+
         # Standardize test predictor using training statistics
         ds_test_stand = deep4downscaling.trans.standardize(data_ref=x_train, data=ds_test)
         
@@ -124,6 +144,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     use_orography = args.use_orography
 
+    # Add an orography tag in the final output folder when relevant.
+    model_path_has_orog = "orog" in MODEL_PATH.lower()
+    submission_path_has_orog = "orog" in SUBMISSION_PATH.lower()
+    if (use_orography or model_path_has_orog) and not submission_path_has_orog:
+        SUBMISSION_PATH = f"{SUBMISSION_PATH}_orog"
+
     # Create the output base directory
     os.makedirs(SUBMISSION_PATH, exist_ok=True)
 
@@ -133,7 +159,7 @@ if __name__ == "__main__":
         
         # Find all test predictor files for this domain
         test_dir = f'{DATA_PATH}/{domain}/test'
-        predictor_files = glob.glob(f'{test_dir}/**/*.nc', recursive=True)
+        predictor_files = glob.glob(f'{test_dir}/**/predictors/**/*.nc', recursive=True)
         
         for pred_path in predictor_files:
             parts = pred_path.split(os.sep)

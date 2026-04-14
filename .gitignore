@@ -5,3 +5,6 @@
 **/__pycache__/
 *.pt
 **/logs/
+*.zip
+**/data/submission/
+**/data/submission_orog/
